@@ -619,7 +619,7 @@ require('lazy').setup({
       local servers = {
         -- clangd = {},
         -- gopls = {},
-        -- pyright = {},
+        pyright = {},
         -- rust_analyzer = {},
         -- ... etc. See `:help lspconfig-all` for a list of all the pre-configured LSPs
         --
@@ -628,22 +628,6 @@ require('lazy').setup({
         --
         -- But for many setups, the LSP (`ts_ls`) will work just fine
         -- ts_ls = {},
-        pylsp = {
-          settings = {
-            pylsp = {
-              plugins = {
-                pyflakes = { enabled = false },
-                pycodestyle = { enabled = false },
-                autopep8 = { enabled = false },
-                yapf = { enabled = false },
-                mccabe = { enabled = false },
-                pylsp_mypy = { enabled = false },
-                pylsp_black = { enabled = false },
-                pylsp_isort = { enabled = false },
-              },
-            },
-          },
-        },
 
         lua_ls = {
           -- cmd = { ... },
@@ -674,6 +658,10 @@ require('lazy').setup({
       local ensure_installed = vim.tbl_keys(servers or {})
       vim.list_extend(ensure_installed, {
         'stylua', -- Used to format Lua code
+        'black',
+        'isort',
+        'ruff',
+        'pyright',
       })
       require('mason-tool-installer').setup { ensure_installed = ensure_installed }
 
@@ -690,6 +678,58 @@ require('lazy').setup({
         },
       }
     end,
+  },
+
+  { -- Autoformat
+    'stevearc/conform.nvim',
+    event = { 'BufWritePre' },
+    cmd = { 'ConformInfo' },
+    keys = {
+      {
+        '<leader>f',
+        function()
+          require('conform').format { async = true, lsp_format = 'fallback' }
+        end,
+        mode = '',
+        desc = '[F]ormat buffer',
+      },
+    },
+    opts = {
+      notify_on_error = false,
+      format_on_save = function(bufnr)
+        -- Disable "format_on_save lsp_fallback" for languages that don't
+        -- have a well standardized coding style. You can add additional
+        -- languages here or re-enable it for the disabled ones.
+        local disable_filetypes = { c = true, cpp = true }
+        local lsp_format_opt
+        if disable_filetypes[vim.bo[bufnr].filetype] then
+          lsp_format_opt = 'never'
+        else
+          lsp_format_opt = 'fallback'
+        end
+        return {
+          timeout_ms = 500,
+          lsp_format = lsp_format_opt,
+        }
+      end,
+      formatters = {
+        black = {
+          prepend_args = { '--line-length', '79' },
+        },
+      },
+      formatters_by_ft = {
+        lua = { 'stylua' },
+        -- Conform can also run multiple formatters sequentially
+        python = {
+          'ruff_fix',
+          'isort',
+          'black',
+        },
+        --
+        -- You can use 'stop_after_first' to run the first available formatter from the list
+        -- javascript = { "prettierd", "prettier", stop_after_first = true },
+      },
+    },
   },
 
   { -- Autocompletion
@@ -903,7 +943,7 @@ require('lazy').setup({
   --
   require 'kickstart.plugins.debug',
   require 'kickstart.plugins.indent_line',
-  -- require 'kickstart.plugins.lint',
+  require 'kickstart.plugins.lint',
   -- require 'kickstart.plugins.autopairs',
   require 'kickstart.plugins.neo-tree',
   -- require 'kickstart.plugins.gitsigns', -- adds gitsigns recommend keymaps
